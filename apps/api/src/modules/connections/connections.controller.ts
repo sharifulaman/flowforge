@@ -7,6 +7,7 @@ import { WorkspaceGuard } from '../../common/guards/workspace.guard';
 import { ZodPipe } from '../../common/pipes/zod-validation.pipe';
 import type { Principal, WorkspaceContext } from '../../types/principal';
 import { ConnectionsService } from './connections.service';
+import { safeReturnTo } from '../auth/auth.controller';
 import { OAuthService } from './oauth.service';
 
 @Controller('workspaces/:workspaceId/connections')
@@ -43,6 +44,7 @@ export class ConnectionsController {
     @Param('appKey') appKey: string,
     @Query('name') name: unknown,
     @Query('connectionId') connectionId: unknown,
+    @Query('returnTo') returnTo: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (principal.type !== 'user') throw ApiException.forbidden('OAuth connections must be created by a signed-in user');
@@ -52,6 +54,7 @@ export class ConnectionsController {
       appKey,
       name: typeof name === 'string' && name.trim() ? name.trim().slice(0, 100) : undefined,
       connectionId: typeof connectionId === 'string' && connectionId ? connectionId : undefined,
+      returnTo: typeof returnTo === 'string' && safeReturnTo(returnTo) !== '/' ? safeReturnTo(returnTo) : undefined,
     });
     return void reply.redirect(url, 302);
   }

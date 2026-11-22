@@ -143,6 +143,22 @@ describe('OAuth2 connections', () => {
     expect(await ctx.prisma.connection.count()).toBe(1);
   });
 
+  it('returns to a same-site page (e.g. the builder) and ignores open redirects', async () => {
+    const alice = await signUp(ctx, 'alice@example.com');
+    const state = await startFlow(alice.api, alice.ws, `?returnTo=${encodeURIComponent(`/w/${alice.ws}/zaps/z1?step=s1`)}`);
+    const cb = await alice.api.get(`/connections/oauth/callback?state=${state}&code=good`);
+    const loc = new URL(cb.headers.location as string);
+    expect(loc.origin).toBe('http://localhost:3000');
+    expect(loc.pathname).toBe(`/w/${alice.ws}/zaps/z1`);
+    expect(loc.searchParams.get('step')).toBe('s1');
+    expect(loc.searchParams.get('connected')).toBeTruthy();
+
+    const evil = await startFlow(alice.api, alice.ws, `?returnTo=${encodeURIComponent('//evil.example/x')}`);
+    const cb2 = await alice.api.get(`/connections/oauth/callback?state=${evil}&code=good`);
+    expect(new URL(cb2.headers.location as string).origin).toBe('http://localhost:3000');
+    expect(new URL(cb2.headers.location as string).pathname).toBe(`/w/${alice.ws}/connections`);
+  });
+
   it('binds the flow to the user who started it', async () => {
     const alice = await signUp(ctx, 'alice@example.com');
     const mallory = await signUp(ctx, 'mallory@example.com');

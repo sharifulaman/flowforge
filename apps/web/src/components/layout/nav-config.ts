@@ -19,9 +19,9 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '', icon: LayoutDashboardIcon },
-  { label: 'Zaps', href: '/zaps', icon: WorkflowIcon, soon: true },
+  { label: 'Zaps', href: '/zaps', icon: WorkflowIcon },
   { label: 'Runs', href: '/runs', icon: ActivityIcon, soon: true },
-  { label: 'Connections', href: '/connections', icon: PlugIcon, soon: true },
+  { label: 'Connections', href: '/connections', icon: PlugIcon },
 ];
 
 export const NAV_SECONDARY: NavItem[] = [

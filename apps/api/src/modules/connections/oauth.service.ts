@@ -15,6 +15,8 @@ interface OAuthState {
   codeVerifier: string;
   name?: string;
   connectionId?: string;
+  /** Same-site path to return to (e.g. the builder). */
+  returnTo?: string;
 }
 
 const STATE_TTL_SECONDS = 600;
@@ -51,15 +53,19 @@ export class OAuthService {
 
   /** Returns the web URL to redirect the browser to (success or error). */
   async callback(p: { userId: string | null; state?: string; code?: string; error?: string }): Promise<string> {
+    const back = (st: OAuthState, param: 'connected' | 'error', v: string) => {
+      const url = new URL(st.returnTo ?? `/w/${st.workspaceId}/connections`, this.env.WEB_URL);
+      url.searchParams.set(param, v);
+      return url.toString();
+    };
+    let st: OAuthState | null = null;
     const fail = (workspaceId: string | null, reason: string) =>
-      workspaceId
-        ? `${this.env.WEB_URL}/w/${workspaceId}/connections?error=${encodeURIComponent(reason)}`
-        : `${this.env.WEB_URL}/?oauth_error=${encodeURIComponent(reason)}`;
+      st ? back(st, 'error', reason) : workspaceId ? `${this.env.WEB_URL}/w/${workspaceId}/connections?error=${encodeURIComponent(reason)}` : `${this.env.WEB_URL}/?oauth_error=${encodeURIComponent(reason)}`;
 
     if (!p.state) return fail(null, 'Missing OAuth state');
     const raw = await this.redis.getdel(stateKey(p.state));
     if (!raw) return fail(null, 'Sign-in session expired — please try again');
-    const st = JSON.parse(raw) as OAuthState;
+    st = JSON.parse(raw) as OAuthState;
 
     if (!p.userId || p.userId !== st.userId) return fail(st.workspaceId, 'Sign-in was started by a different user');
     if (p.error) return fail(st.workspaceId, p.error === 'access_denied' ? 'Access was denied' : `Provider error: ${p.error}`);
@@ -67,6 +73,7 @@ export class OAuthService {
 
     const app = this.connections.appOrThrow(st.appKey);
     const auth = app.auth as OAuth2Auth;
+    const state = st;
     const client = oauthClientCredentials(auth, process.env);
     if (!client) return fail(st.workspaceId, `${app.name} sign-in is not configured`);
 
@@ -77,12 +84,12 @@ export class OAuthService {
         this.fetchImpl,
       );
       const conn = await this.connections.saveOAuth(
-        { workspaceId: st.workspaceId, userId: st.userId, app, name: st.name, connectionId: st.connectionId },
+        { workspaceId: state.workspaceId, userId: state.userId, app, name: state.name, connectionId: state.connectionId },
         tokens,
       );
-      return `${this.env.WEB_URL}/w/${st.workspaceId}/connections?connected=${conn.id}`;
+      return back(state, 'connected', conn.id);
     } catch (err) {
-      return fail(st.workspaceId, `Could not connect ${app.name}: ${(err as Error).message}`.slice(0, 300));
+      return fail(state.workspaceId, `Could not connect ${app.name}: ${(err as Error).message}`.slice(0, 300));
     }
   }
 }

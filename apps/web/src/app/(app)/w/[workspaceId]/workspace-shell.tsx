@@ -2,6 +2,7 @@
 
 import { SearchXIcon } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { EmptyState } from '@/components/common/empty-state';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
@@ -12,13 +13,15 @@ import { useMe } from '@/hooks/use-auth';
 export function WorkspaceShell({ workspaceId, children }: { workspaceId: string; children: React.ReactNode }) {
   const { data, isLoading } = useMe();
   const member = data?.workspaces.some((w) => w.id === workspaceId);
+  // The builder uses the full viewport (canvas + side panel).
+  const fullBleed = /\/zaps\/[^/]+$/.test(usePathname());
 
   return (
     <div className="flex min-h-dvh">
       <Sidebar workspaceId={workspaceId} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar workspaceId={workspaceId} />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-8">
+        <main className={fullBleed ? 'h-[calc(100dvh-3.5rem)] w-full overflow-hidden' : 'mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-8'}>
           {isLoading ? (
             <div className="grid gap-4">
               <Skeleton className="h-8 w-56" />
@@ -41,7 +44,7 @@ export function WorkspaceShell({ workspaceId, children }: { workspaceId: string;
               }
             />
           ) : (
-            <div className="animate-in fade-in-0 duration-300">{children}</div>
+            <div className={fullBleed ? 'h-full animate-in fade-in-0 duration-300' : 'animate-in fade-in-0 duration-300'}>{children}</div>
           )}
         </main>
       </div>

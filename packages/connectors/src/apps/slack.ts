@@ -25,7 +25,7 @@ export default defineApp({
   name: 'Slack',
   description: 'Send messages to Slack channels.',
   category: 'communication',
-  icon: 'Slack',
+  icon: 'Hash',
   color: '#4A154B',
   auth: {
     type: 'api_key',
