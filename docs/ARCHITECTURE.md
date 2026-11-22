@@ -9,7 +9,7 @@ each step's output can be referenced by later steps with `{{ stepKey.path }}` te
 |---|---|---|
 | `apps/web` | Next.js App Router, Tailwind, shadcn/ui | UI only. Proxies `/api/*` to the API so auth cookies are first-party. |
 | `apps/api` | NestJS (Fastify) | Auth, CRUD, publishing, webhook ingestion. Enqueues work; **never executes user steps**. |
-| `apps/worker` | BullMQ consumers | Executes runs, fires schedules, polls, runs the isolated-vm sandbox. *(phase c)* |
+| `apps/worker` | BullMQ consumers | Executes runs, fires schedules, polls, tests steps, runs the isolated-vm sandbox, housekeeping. |
 | PostgreSQL | Prisma | Source of truth. Every tenant row carries `workspaceId`. |
 | Redis | BullMQ, rate limits, OAuth state | Queues: `ff-runs`, `ff-triggers`, `ff-test-step`. |
 
@@ -20,7 +20,8 @@ shared         isomorphic: zod DTOs, queue contracts, templating; node-only: cry
 connector-sdk  defineApp(), operation/auth types, JSON-schema validation, ConnectorRegistry
 connectors     built-in apps + createDefaultRegistry()
 engine         runtime core used by api + worker: SSRF-safe HTTP, CredentialStore (AES-256-GCM,
-               OAuth refresh), publish validation, RunLauncher, TriggerManager, executor (phase c)
+               OAuth refresh), publish validation, RunLauncher, TriggerManager, RunExecutor,
+               TriggerRuntime (schedule/poll), StepTester, maintenance
 db             Prisma schema, migrations, client
 ```
 
@@ -51,6 +52,36 @@ dropped), `app:<event id>` for app events, `manual:<uuid>`, `replay:<runId>:<uui
 
 **Replay.** Same zap version and trigger data. `from_failed` pre-seeds the succeeded prefix of
 `StepRun`s; the engine skips completed steps (checkpointing) and resumes at the failure.
+
+## Execution engine
+
+`RunExecutor.execute(runId, { attempt, maxAttempts })` is idempotent and returns an outcome; the
+worker maps outcomes onto BullMQ:
+
+| Outcome | Meaning | Worker action |
+|---|---|---|
+| `SUCCEEDED` / `FILTERED` / `FAILED` | terminal, persisted | complete the job (auto-pause zap after N consecutive failures) |
+| `RETRY` | transient error, attempts left | throw → BullMQ retries with `ff-backoff` (10s·2ⁿ ±20%, ≤15 min, honours Retry-After) |
+| `SUSPENDED` | Delay step | `job.moveToDelayed(resumeAt)` + `DelayedError` (no worker slot held, no attempt consumed) |
+| `CANCELED` / `ALREADY_DONE` / `NOT_FOUND` | nothing to do | complete the job |
+
+Per step: resolve templates against `{ trigger, step1, … }` → validate against the action's JSON
+schema (defaults applied) → load/refresh credentials → run with `AbortSignal` + timeout (default
+30 s, 1 s–5 min) → normalize output (JSON, ≤ 1 MB) → checkpoint `StepRun`. Error classes:
+`RetryableError`/network/timeout → retry; `FatalError`/unknown exceptions → fail; `AuthError` →
+fail and flag the connection; `StopRun` → FILTERED; `SuspendRun` → delay. Cancellation is checked
+between steps and a cancel always wins over completion. Idempotency key per step:
+`<runId>:<stepKey>` (stable across retries).
+
+**Code steps** run in `isolated-vm`: fresh isolate per execution, memory cap, CPU timeout plus
+wall-clock guard, no Node APIs/network/timers, JSON-only input/output, console captured.
+
+**Housekeeping** (every 5 min): re-enqueue runs whose jobs vanished; purge poll dedupe keys > 30
+days. Jobs that exhaust attempts outside the executor (crashes) mark their run FAILED.
+
+**Test step**: the API enqueues on `ff-test-step` and waits (≤ 60 s) via `QueueEvents`; the
+worker runs the draft step with earlier steps' samples as data and saves the output as its
+sample. Webhooks to a draft/paused zap are stored as the trigger's sample instead of running.
 
 ## Security
 

@@ -7,3 +7,5 @@ export const RUN_LAUNCHER = Symbol('RUN_LAUNCHER');
 export const TRIGGER_MANAGER = Symbol('TRIGGER_MANAGER');
 /** fetch used for OAuth token exchanges (overridable in tests). */
 export const OAUTH_FETCH = Symbol('OAUTH_FETCH');
+export const TEST_STEP_QUEUE = Symbol('TEST_STEP_QUEUE');
+export const TEST_STEP_EVENTS = Symbol('TEST_STEP_EVENTS');

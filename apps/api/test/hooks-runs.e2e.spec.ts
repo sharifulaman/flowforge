@@ -98,16 +98,20 @@ describe('catch hook', () => {
     expect(await ctx.prisma.run.count()).toBe(3);
   });
 
-  it('404s unknown tokens and 409s paused zaps; URL survives pause/resume', async () => {
+  it('404s unknown tokens; paused zaps capture sample data; URL survives pause/resume', async () => {
     const u = await signUp(ctx, 'a@example.com');
     const { path, base } = await liveWebhookZap(u);
     expect((await hook('/hooks/does-not-exist-but-long-enough-token')).statusCode).toBe(404);
     expect((await hook('/hooks/short')).statusCode).toBe(404);
 
     await u.api.post(`${base}/disable`);
-    const paused = await hook(path, { payload: {} });
-    expect(paused.statusCode).toBe(409);
-    expect(paused.json().error.code).toBe('ZAP_INACTIVE');
+    const runsBefore = await ctx.prisma.run.count();
+    const paused = await hook(path, { payload: { email: 'sample@example.com' } });
+    expect(paused.statusCode).toBe(200);
+    expect(paused.json()).toEqual({ status: 'sample_captured' });
+    expect(await ctx.prisma.run.count()).toBe(runsBefore);
+    const samples = (await u.api.get(`${base}/samples`)).json();
+    expect(samples[0]).toMatchObject({ key: 'trigger', isExample: false, sample: { body: { email: 'sample@example.com' } } });
 
     await u.api.post(`${base}/enable`);
     expect((await hook(path, { payload: {} })).statusCode).toBe(202);
@@ -135,6 +139,19 @@ describe('catch hook', () => {
     expect(sent).toBe(301);
     expect((await hook(second.path, { method: 'GET' })).statusCode).toBe(202);
   }, 60_000);
+});
+
+describe('sample capture before publishing', () => {
+  it('captures the first request to a draft zap as trigger sample data', async () => {
+    const u = await signUp(ctx, 'a@example.com');
+    const zap = (await u.api.post(`/workspaces/${u.ws}/zaps`, { name: 'Draft' })).json();
+    const detail = (await u.api.put(`/workspaces/${u.ws}/zaps/${zap.id}/trigger`, { appKey: 'webhook', operationKey: 'catchHook' })).json();
+    const res = await hook(new URL(detail.trigger.hookUrl).pathname, { payload: { order: 42 } });
+    expect(res.json()).toEqual({ status: 'sample_captured' });
+    const step = (await u.api.get(`/workspaces/${u.ws}/zaps/${zap.id}`)).json().steps[0];
+    expect(step.sampleOutput).toMatchObject({ method: 'POST', body: { order: 42 } });
+    expect(step.sampleAt).toBeTruthy();
+  });
 });
 
 describe('app-event hook', () => {

@@ -1,0 +1,32 @@
+{
+  "name": "@flowforge/worker",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc-watch -p tsconfig.build.json --noClear --onSuccess \"node --no-node-snapshot dist/main.js\"",
+    "start": "node --no-node-snapshot dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@flowforge/connector-sdk": "workspace:*",
+    "@flowforge/connectors": "workspace:*",
+    "@flowforge/db": "workspace:*",
+    "@flowforge/engine": "workspace:*",
+    "@flowforge/shared": "workspace:*",
+    "bullmq": "5.81.6",
+    "ioredis": "5.11.1",
+    "isolated-vm": "6.2.0",
+    "pino": "10.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@flowforge/tsconfig": "workspace:*",
+    "@types/node": "22.18.12",
+    "tsc-watch": "7.2.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

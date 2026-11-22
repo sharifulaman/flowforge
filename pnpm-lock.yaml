@@ -197,6 +197,55 @@ importers:
         specifier: 3.2.7
         version: 3.2.7(@types/node@22.18.12)(jiti@2.7.0)(lightningcss@1.33.0)
 
+  apps/worker:
+    dependencies:
+      '@flowforge/connector-sdk':
+        specifier: workspace:*
+        version: link:../../packages/connector-sdk
+      '@flowforge/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
+      '@flowforge/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@flowforge/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
+      '@flowforge/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      bullmq:
+        specifier: 5.81.6
+        version: 5.81.6
+      ioredis:
+        specifier: 5.11.1
+        version: 5.11.1
+      isolated-vm:
+        specifier: 6.2.0
+        version: 6.2.0
+      pino:
+        specifier: 10.4.0
+        version: 10.4.0
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@flowforge/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: 22.18.12
+        version: 22.18.12
+      tsc-watch:
+        specifier: 7.2.1
+        version: 7.2.1(typescript@5.9.3)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/node@22.18.12)(jiti@2.7.0)(lightningcss@1.33.0)
+
   packages/connector-sdk:
     dependencies:
       '@flowforge/shared':
@@ -2019,6 +2068,10 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
+
+  isolated-vm@6.2.0:
+    resolution: {integrity: sha512-UuSlxSHWt2QuJ5WvBhzlIJx2VVZN/a44SqBbEZFKNdvuSyhOvhmyDo8SQ+njVbhnh/njoL/aW0bUTiFYlpweGQ==}
+    engines: {node: '>=22.0.0'}
 
   iterare@1.2.1:
     resolution: {integrity: sha512-RKYVTCjAnRthyJes037NX/IiqeidgN1xc3j1RjFfECFp28A1GVwK9nA+i0rJPaHqSZwygLzRnFlzUuHFoWWy+Q==}
@@ -4172,6 +4225,10 @@ snapshots:
   ipaddr.js@2.5.0: {}
 
   isexe@2.0.0: {}
+
+  isolated-vm@6.2.0:
+    dependencies:
+      node-gyp-build: 4.8.4
 
   iterare@1.2.1: {}
 

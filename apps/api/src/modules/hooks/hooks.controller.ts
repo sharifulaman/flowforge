@@ -79,8 +79,19 @@ export class HooksController {
   async catchHook(@Param('token') token: string, @Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     const state = await this.loadState(token, 'webhook');
     const zap = state.zap;
+    const output = {
+      method: req.method,
+      body: req.body ?? null,
+      query: queryRecord(req),
+      headers: safeHeaders(req),
+      receivedAt: new Date().toISOString(),
+    };
+
+    // While a zap is off (e.g. being built), requests become the trigger's sample data so the
+    // builder can map real fields before going live.
     if (zap.status !== 'ACTIVE' || !zap.publishedVersionId) {
-      throw new ApiException(HttpStatus.CONFLICT, ErrorCode.ZAP_INACTIVE, 'This Zap is turned off');
+      await this.captureSample(zap.id, output);
+      return void reply.status(200).send({ status: 'sample_captured' });
     }
 
     const senderKey = idempotencyKeyFrom(req);
@@ -91,13 +102,7 @@ export class HooksController {
         zapId: zap.id,
         zapVersionId: zap.publishedVersionId,
         source: 'WEBHOOK',
-        triggerOutput: {
-          method: req.method,
-          body: req.body ?? null,
-          query: queryRecord(req),
-          headers: safeHeaders(req),
-          receivedAt: new Date().toISOString(),
-        },
+        triggerOutput: output,
         // Without a sender key every request is a distinct event (never silently dropped).
         idempotencyKey: senderKey ? `hdr:${senderKey}` : `req:${req.id}`,
       });
@@ -109,6 +114,15 @@ export class HooksController {
     return void reply
       .status(result.duplicate ? 200 : 202)
       .send({ status: result.duplicate ? 'duplicate' : 'accepted', runId: result.runId });
+  }
+
+  private async captureSample(zapId: string, output: unknown): Promise<void> {
+    const json = JSON.stringify(output);
+    if (json.length > 256 * 1024) throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, ErrorCode.BAD_REQUEST, 'Sample payload is too large');
+    await this.prisma.zapStep.updateMany({
+      where: { zapId, type: 'TRIGGER' },
+      data: { sampleOutput: JSON.parse(json), sampleAt: new Date() },
+    });
   }
 
   private touch(zapId: string): void {

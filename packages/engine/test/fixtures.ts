@@ -86,3 +86,106 @@ export const OAUTH_ENV = { OAUTHY_CLIENT_ID: 'cid', OAUTHY_CLIENT_SECRET: 'csecr
 export function testRegistry(): ConnectorRegistry {
   return new ConnectorRegistry([...BUILT_IN_APPS, testApp, oauthApp], OAUTH_ENV);
 }
+
+// ─── Executor test kit ─────────────────────────────────────
+
+import { AuthError as _AuthError, FatalError as _FatalError, RetryableError as _RetryableError, SuspendRun as _SuspendRun } from '@flowforge/connector-sdk';
+
+export const calls: Record<string, number> = {};
+const bump = (k: string) => (calls[k] = (calls[k] ?? 0) + 1);
+export const pollState: { items: Array<{ id: string; data: Record<string, unknown> }>; cursorsSeen: unknown[]; fail?: 'auth' | 'net' } = {
+  items: [],
+  cursorsSeen: [],
+};
+
+export const testkit = defineApp({
+  key: 'testkit',
+  name: 'Test kit',
+  description: 'Executor fixtures',
+  category: 'developer',
+  icon: 'FlaskConical',
+  color: '#000000',
+  auth: { type: 'none' },
+  triggers: [
+    {
+      key: 'poll',
+      name: 'Poll',
+      description: 'Polling fixture',
+      kind: 'polling',
+      intervalSeconds: 60,
+      input: objectSchema({}),
+      async poll(ctx) {
+        pollState.cursorsSeen.push(ctx.cursor);
+        if (pollState.fail === 'auth') throw new _AuthError('token revoked');
+        if (pollState.fail === 'net') throw new _RetryableError('provider 503');
+        return { items: pollState.items, cursor: { seen: pollState.items.length } };
+      },
+    },
+  ],
+  actions: [
+    {
+      key: 'echo',
+      name: 'Echo',
+      description: 'Returns its input',
+      input: { type: 'object', properties: {}, additionalProperties: true },
+      run: async ({ input, idempotencyKey, isTest }) => {
+        bump('echo');
+        return { ...input, idempotencyKey, isTest };
+      },
+    },
+    {
+      key: 'typed',
+      name: 'Typed',
+      description: 'Needs a number',
+      input: objectSchema({ n: { type: 'number' }, label: { type: 'string', default: 'none' } }, ['n']),
+      run: async ({ input }) => ({ doubled: (input.n as number) * 2, label: input.label }),
+    },
+    {
+      key: 'flaky',
+      name: 'Flaky',
+      description: 'Fails `times` times, then succeeds',
+      input: objectSchema({ times: { type: 'integer' }, key: { type: 'string' } }, ['times', 'key']),
+      run: async ({ input }) => {
+        const n = bump(`flaky:${input.key}`);
+        if (n <= (input.times as number)) throw new _RetryableError(`flaky failure #${n}`, n === 1 ? 5_000 : undefined);
+        return { succeededOnCall: n };
+      },
+    },
+    { key: 'boom', name: 'Boom', description: 'Fatal', input: objectSchema({}), run: async () => { bump('boom'); throw new _FatalError('bad request: 400', 'HTTP_400'); } },
+    { key: 'crash', name: 'Crash', description: 'Bug', input: objectSchema({}), run: async () => { throw new TypeError("Cannot read properties of undefined (reading 'x')"); } },
+    { key: 'authFail', name: 'AuthFail', description: 'Auth', input: objectSchema({}), run: async () => { throw new _AuthError('token revoked'); } },
+    {
+      key: 'slow',
+      name: 'Slow',
+      description: 'Honours abort',
+      timeoutMs: 1_000,
+      input: objectSchema({}),
+      run: ({ signal }) =>
+        new Promise((resolve, reject) => {
+          const t = setTimeout(() => resolve({ done: true }), 10_000);
+          signal.addEventListener('abort', () => {
+            clearTimeout(t);
+            reject(signal.reason);
+          });
+        }),
+    },
+    { key: 'hang', name: 'Hang', description: 'Ignores abort', timeoutMs: 1_000, input: objectSchema({}), run: () => new Promise(() => undefined) },
+    {
+      key: 'wait',
+      name: 'Wait',
+      description: 'Suspends',
+      input: objectSchema({ ms: { type: 'integer' } }, ['ms']),
+      run: async ({ input }) => {
+        bump('wait');
+        throw new _SuspendRun(new Date(Date.now() + (input.ms as number)));
+      },
+    },
+    { key: 'big', name: 'Big', description: 'Too big', input: objectSchema({}), run: async () => ({ blob: 'x'.repeat(1_100_000) }) },
+    { key: 'logs', name: 'Logs', description: 'Logs', input: objectSchema({}), run: async ({ logger }) => { logger.info('hello', { a: 1 }); logger.warn('careful'); return { ok: true }; } },
+    { key: 'nothing', name: 'Nothing', description: 'Returns undefined', input: objectSchema({}), run: async () => undefined },
+  ],
+});
+
+export function executorRegistry(): ConnectorRegistry {
+  return new ConnectorRegistry([...BUILT_IN_APPS, testApp, oauthApp, testkit], OAUTH_ENV);
+}

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { ConnectorRegistry } from '@flowforge/connector-sdk';
 import {
   type AddStepInput,
@@ -13,6 +14,7 @@ import {
   type ReorderStepsInput,
   reorderStepsSchema,
   type SetTriggerInput,
+  type TestStepResult,
   setTriggerSchema,
   type UpdateStepInput,
   updateStepSchema,
@@ -28,6 +30,7 @@ import { ZodPipe } from '../../common/pipes/zod-validation.pipe';
 import { CONNECTOR_REGISTRY } from '../../runtime/tokens';
 import type { WorkspaceContext } from '../../types/principal';
 import { ZapLifecycleService } from './lifecycle.service';
+import { StepTestService } from './step-test.service';
 import { StepsService } from './steps.service';
 import { sortedSteps } from './zap-mapper';
 import { ZapsService } from './zaps.service';
@@ -52,6 +55,7 @@ export class ZapsController {
     private readonly zaps: ZapsService,
     private readonly steps: StepsService,
     private readonly lifecycle: ZapLifecycleService,
+    private readonly stepTests: StepTestService,
     @Inject(CONNECTOR_REGISTRY) private readonly registry: ConnectorRegistry,
   ) {}
 
@@ -137,6 +141,14 @@ export class ZapsController {
   @Delete(':zapId/steps/:stepId')
   deleteStep(@CurrentWorkspace() ws: WorkspaceContext, @Param('zapId') zapId: string, @Param('stepId') stepId: string): Promise<ZapDetailDto> {
     return this.steps.deleteStep(ws.id, zapId, stepId);
+  }
+
+  /** Run one draft step for real (in the worker); a successful output becomes its sample. */
+  @Post(':zapId/steps/:stepId/test')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  testStep(@CurrentWorkspace() ws: WorkspaceContext, @Param('zapId') zapId: string, @Param('stepId') stepId: string): Promise<TestStepResult> {
+    return this.stepTests.test(ws.id, zapId, stepId);
   }
 
   /** Data available to the field picker: each step's last test output (or example output). */

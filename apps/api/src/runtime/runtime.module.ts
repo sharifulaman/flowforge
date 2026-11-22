@@ -2,10 +2,10 @@ import { Global, Inject, Injectable, Module, type OnModuleDestroy } from '@nestj
 import type { ConnectorRegistry } from '@flowforge/connector-sdk';
 import { createDefaultRegistry } from '@flowforge/connectors';
 import { CredentialStore, type FetchLike, RunLauncher, SafeHttpClient, toConnectorLogger, TriggerManager } from '@flowforge/engine';
-import { QUEUES, type RunJobData, type TriggerJobData } from '@flowforge/shared';
+import { QUEUES, type RunJobData, type TestStepJobData, type TriggerJobData } from '@flowforge/shared';
 import { createLogger, type SecretBox } from '@flowforge/shared/node';
-import { Queue } from 'bullmq';
-import type { Redis } from 'ioredis';
+import { Queue, QueueEvents } from 'bullmq';
+import { Redis } from 'ioredis';
 import { SECRET_BOX } from '../config/config.module';
 import { API_ENV, type ApiEnv } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,6 +17,8 @@ import {
   RUN_LAUNCHER,
   RUNS_QUEUE,
   SAFE_HTTP,
+  TEST_STEP_EVENTS,
+  TEST_STEP_QUEUE,
   TRIGGER_MANAGER,
   TRIGGERS_QUEUE,
 } from './tokens';
@@ -27,10 +29,12 @@ class RuntimeLifecycle implements OnModuleDestroy {
     @Inject(RUNS_QUEUE) private readonly runs: Queue,
     @Inject(TRIGGERS_QUEUE) private readonly triggers: Queue,
     @Inject(SAFE_HTTP) private readonly http: SafeHttpClient,
+    @Inject(TEST_STEP_QUEUE) private readonly testQueue: Queue,
+    @Inject(TEST_STEP_EVENTS) private readonly testEvents: QueueEvents,
   ) {}
 
   async onModuleDestroy(): Promise<void> {
-    await Promise.allSettled([this.runs.close(), this.triggers.close(), this.http.close()]);
+    await Promise.allSettled([this.runs.close(), this.triggers.close(), this.testQueue.close(), this.testEvents.close(), this.http.close()]);
   }
 }
 
@@ -65,6 +69,21 @@ class RuntimeLifecycle implements OnModuleDestroy {
       useFactory: (connection: Redis) => new Queue<TriggerJobData>(QUEUES.triggers, { connection }),
     },
     {
+      provide: TEST_STEP_QUEUE,
+      inject: [REDIS],
+      useFactory: (connection: Redis) => new Queue<TestStepJobData>(QUEUES.testStep, { connection }),
+    },
+    {
+      // QueueEvents blocks on Redis streams, so it needs its own connection.
+      provide: TEST_STEP_EVENTS,
+      inject: [API_ENV],
+      useFactory: async (env: ApiEnv) => {
+        const events = new QueueEvents(QUEUES.testStep, { connection: new Redis(env.REDIS_URL, { maxRetriesPerRequest: null }) });
+        await events.waitUntilReady();
+        return events;
+      },
+    },
+    {
       provide: RUN_LAUNCHER,
       inject: [PrismaService, RUNS_QUEUE],
       useFactory: (prisma: PrismaService, queue: Queue<RunJobData>) => new RunLauncher(prisma, queue),
@@ -94,6 +113,6 @@ class RuntimeLifecycle implements OnModuleDestroy {
     },
     RuntimeLifecycle,
   ],
-  exports: [CONNECTOR_REGISTRY, CREDENTIAL_STORE, SAFE_HTTP, RUNS_QUEUE, TRIGGERS_QUEUE, RUN_LAUNCHER, TRIGGER_MANAGER, OAUTH_FETCH],
+  exports: [CONNECTOR_REGISTRY, CREDENTIAL_STORE, SAFE_HTTP, RUNS_QUEUE, TRIGGERS_QUEUE, TEST_STEP_QUEUE, TEST_STEP_EVENTS, RUN_LAUNCHER, TRIGGER_MANAGER, OAUTH_FETCH],
 })
 export class RuntimeModule {}

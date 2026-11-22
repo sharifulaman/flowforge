@@ -44,3 +44,13 @@ export class StopRun extends ConnectorError {
     super(reason, 'STOPPED');
   }
 }
+
+/**
+ * Pause the run and resume this step at `resumeAt` (used by Delay). The engine frees the
+ * worker slot; when the run resumes, the suspending step completes with `{ resumedAt }`.
+ */
+export class SuspendRun extends ConnectorError {
+  constructor(public readonly resumeAt: Date) {
+    super(`Suspended until ${resumeAt.toISOString()}`, 'SUSPENDED');
+  }
+}
