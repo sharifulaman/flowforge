@@ -3,10 +3,12 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@flowforge/db';
 import { Redis } from 'ioredis';
-import { configureApp, createAdapter, createApiLogger } from '../src/app.factory';
+import { configureApp, createAdapter, createApiLogger, NEST_APP_OPTIONS } from '../src/app.factory';
 import { AppModule } from '../src/app.module';
 import { loadApiEnv } from '../src/config/env';
 import { GoogleOAuthClient, type GoogleProfile } from '../src/modules/auth/google-oauth.client';
+import { CONNECTOR_REGISTRY, OAUTH_FETCH } from '../src/runtime/tokens';
+import { fakeOAuthFetch, testRegistry } from './fixtures';
 
 export const ORIGIN = 'http://localhost:3000';
 
@@ -47,9 +49,14 @@ export async function createTestApp(): Promise<TestContext> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule.forRoot(env)] })
     .overrideProvider(GoogleOAuthClient)
     .useValue(google)
+    .overrideProvider(CONNECTOR_REGISTRY)
+    .useValue(testRegistry())
+    .overrideProvider(OAUTH_FETCH)
+    .useValue(fakeOAuthFetch)
     .compile();
 
   const app = moduleRef.createNestApplication<NestFastifyApplication>(createAdapter(env, createApiLogger(env)), {
+    ...NEST_APP_OPTIONS,
     logger: false,
   });
   await configureApp(app, env);
@@ -119,4 +126,30 @@ export async function registerUser(
   if (res.statusCode !== 201) throw new Error(`register failed: ${res.statusCode} ${res.body}`);
   jar.store(res);
   return { jar, body: res.json() };
+}
+
+/** Authenticated request helper bound to a user's cookie jar. */
+export function client(ctx: TestContext, jar: CookieJar) {
+  const call = (method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload?: unknown, headers: Record<string, string> = {}) =>
+    ctx.app.inject({
+      method,
+      url: url.startsWith('/hooks') ? url : `/api/v1${url}`,
+      cookies: jar.all(),
+      headers: { origin: ORIGIN, ...headers },
+      ...(payload !== undefined ? { payload: payload as object } : {}),
+    });
+  return {
+    get: (url: string) => call('GET', url),
+    post: (url: string, body?: unknown) => call('POST', url, body ?? {}),
+    put: (url: string, body?: unknown) => call('PUT', url, body ?? {}),
+    patch: (url: string, body?: unknown) => call('PATCH', url, body ?? {}),
+    del: (url: string) => call('DELETE', url),
+  };
+}
+
+/** Register a user and return a client scoped to their personal workspace. */
+export async function signUp(ctx: TestContext, email: string) {
+  const { jar, body } = await registerUser(ctx, { email });
+  const ws = body.workspaces[0]!.id;
+  return { jar, userId: body.user.id, ws, api: client(ctx, jar) };
 }

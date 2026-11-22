@@ -1,0 +1,8 @@
+{
+  "extends": "@flowforge/tsconfig/node.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src", "test"]
+}

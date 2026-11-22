@@ -9,3 +9,6 @@ process.env.WEB_URL = 'http://localhost:3000';
 process.env.COOKIE_SECURE = 'false';
 process.env.GOOGLE_CLIENT_ID = 'test-client-id';
 process.env.GOOGLE_CLIENT_SECRET = 'test-client-secret';
+process.env.HOOKS_PUBLIC_URL = 'https://hooks.flowforge.test';
+process.env.OAUTHY_CLIENT_ID = 'oauthy-client';
+process.env.OAUTHY_CLIENT_SECRET = 'oauthy-secret';

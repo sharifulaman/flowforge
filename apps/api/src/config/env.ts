@@ -10,6 +10,11 @@ export const apiEnvSchema = baseEnvSchema.extend({
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
   /** Comma-separated extra origins allowed for cookie-authenticated mutations. */
   ALLOWED_ORIGINS: z.string().optional().default(''),
+  /**
+   * Comma-separated hostnames/IPs exempt from SSRF blocking (e.g. "localhost,127.0.0.1" for
+   * local development against services on your machine). Leave empty in production.
+   */
+  HTTP_ALLOW_PRIVATE_HOSTS: z.string().optional().default(''),
   /** Trust X-Forwarded-* headers (set when running behind a reverse proxy / the Next.js rewrite). */
   TRUST_PROXY: z
     .union([z.boolean(), z.string()])

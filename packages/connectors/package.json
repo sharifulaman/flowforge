@@ -1,0 +1,25 @@
+{
+  "name": "@flowforge/connectors",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Built-in FlowForge apps and the default connector registry.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json -w --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@flowforge/connector-sdk": "workspace:*",
+    "@flowforge/shared": "workspace:*",
+    "cron-parser": "4.9.0"
+  },
+  "devDependencies": {
+    "@flowforge/tsconfig": "workspace:*",
+    "@types/node": "22.18.12",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

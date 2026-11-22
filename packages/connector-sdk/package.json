@@ -1,0 +1,25 @@
+{
+  "name": "@flowforge/connector-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Types and helpers for building FlowForge connectors (defineApp).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json -w --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "@flowforge/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@flowforge/tsconfig": "workspace:*",
+    "@types/node": "22.18.12",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

@@ -1,10 +1,12 @@
 import { Global, Module } from '@nestjs/common';
 import { ApiKeyAuthService } from './api-key-auth.service';
+import { ApiKeysController } from './api-keys.controller';
+import { ApiKeysService } from './api-keys.service';
 
-/** Phase (a): authentication only. Create/list/revoke endpoints arrive in phase (b). */
 @Global()
 @Module({
-  providers: [ApiKeyAuthService],
+  controllers: [ApiKeysController],
+  providers: [ApiKeyAuthService, ApiKeysService],
   exports: [ApiKeyAuthService],
 })
 export class ApiKeysModule {}

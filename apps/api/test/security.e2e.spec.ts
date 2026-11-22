@@ -123,6 +123,18 @@ describe('request hygiene', () => {
     expect(res.statusCode).toBe(413);
   });
 
+  it('treats an empty JSON body as no body', async () => {
+    const { jar } = await registerUser(ctx, { email: 'empty@example.com' });
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/workspaces',
+      headers: { origin: ORIGIN, 'content-type': 'application/json', 'content-length': '0' },
+      cookies: jar.all(),
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('VALIDATION_FAILED'); // reached zod, not the JSON parser
+  });
+
   it('returns JSON 404 for unknown routes', async () => {
     const res = await ctx.app.inject({ method: 'GET', url: '/api/v1/nope' });
     expect(res.statusCode).toBe(404);

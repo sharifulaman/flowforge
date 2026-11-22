@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import fastifyCookie from '@fastify/cookie';
 import fastifyHelmet from '@fastify/helmet';
+import { RequestMethod } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createLogger, type Logger } from '@flowforge/shared/node';
 import { LogController } from 'fastify';
@@ -10,6 +11,9 @@ import { createCsrfHook } from './common/csrf';
 import type { ApiEnv } from './config/env';
 
 export const API_PREFIX = 'api/v1';
+
+/** Options passed to NestFactory.create / createNestApplication. */
+export const NEST_APP_OPTIONS = { rawBody: true } as const;
 const REQUEST_ID_RE = /^[A-Za-z0-9._-]{8,128}$/;
 
 export function createApiLogger(env: ApiEnv): Logger {
@@ -39,6 +43,18 @@ export async function configureApp(app: NestFastifyApplication, env: ApiEnv): Pr
   const fastify = app.getHttpAdapter().getInstance();
 
   await app.register(fastifyCookie as never);
+
+  // `content-type: application/json` with an empty body (common from curl/scripts on POSTs
+  // like /enable) is treated as "no body" instead of a 400.
+  fastify.addHook('onRequest', async (req) => {
+    const len = req.headers['content-length'];
+    const noBody = len === '0' || (len === undefined && req.headers['transfer-encoding'] === undefined);
+    if (noBody) delete req.headers['content-type'];
+  });
+
+  // Webhooks may send anything (XML, CSV, …): accept it as a string instead of 415.
+  // (JSON/form raw bodies are kept by Nest's `rawBody: true` option for signature checks.)
+  fastify.addContentTypeParser('*', { parseAs: 'string' }, (_req, body, done) => done(null, body));
   await app.register(fastifyHelmet as never, {
     // The API serves JSON only; the web app sets its own CSP.
     contentSecurityPolicy: false,
@@ -66,6 +82,7 @@ export async function configureApp(app: NestFastifyApplication, env: ApiEnv): Pr
     );
   });
 
-  app.setGlobalPrefix(API_PREFIX);
+  // Public webhooks live at the root: /hooks/:token, /hooks/app/:token
+  app.setGlobalPrefix(API_PREFIX, { exclude: [{ path: 'hooks/{*path}', method: RequestMethod.ALL }] });
   app.enableShutdownHooks();
 }
