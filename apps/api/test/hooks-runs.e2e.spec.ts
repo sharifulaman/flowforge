@@ -62,9 +62,13 @@ describe('catch hook', () => {
     expect(run.triggerOutput.headers.cookie).toBeUndefined();
 
     expect((await runsQueue.getJob(runId))?.data).toEqual({ runId, workspaceId: u.ws });
-    const state = await ctx.prisma.triggerState.findUniqueOrThrow({ where: { zapId: zap.id } });
-    await new Promise((r) => setTimeout(r, 50));
-    expect((await ctx.prisma.triggerState.findUniqueOrThrow({ where: { zapId: zap.id } })).lastFiredAt ?? state.lastFiredAt).toBeTruthy();
+    // lastFiredAt is written fire-and-forget after the response: poll instead of sleeping.
+    let lastFiredAt: Date | null = null;
+    for (let i = 0; i < 60 && !lastFiredAt; i++) {
+      lastFiredAt = (await ctx.prisma.triggerState.findUniqueOrThrow({ where: { zapId: zap.id } })).lastFiredAt;
+      if (!lastFiredAt) await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(lastFiredAt).toBeInstanceOf(Date);
   });
 
   it('accepts form-encoded, plain text and GET query payloads', async () => {
