@@ -27,5 +27,8 @@
     "smtp-server": "3.21.7",
     "@types/smtp-server": "3.5.13",
     "@flowforge/safe-http": "workspace:*"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

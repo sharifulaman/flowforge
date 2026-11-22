@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 22
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  checks:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: flowforge
+          POSTGRES_PASSWORD: flowforge
+          POSTGRES_DB: flowforge
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U flowforge" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create test databases
+        env:
+          PGPASSWORD: flowforge
+        run: psql -h localhost -U flowforge -d flowforge -f docker/postgres-init.sql
+      - run: cp .env.example .env
+      - run: pnpm db:generate
+      - run: pnpm turbo run typecheck test build
+
+  e2e:
+    name: End-to-end (API + worker + web + browser)
+    runs-on: ubuntu-latest
+    needs: checks
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: flowforge
+          POSTGRES_PASSWORD: flowforge
+          POSTGRES_DB: flowforge
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U flowforge" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      # The e2e scripts call a local echo server, so allow loopback for outbound HTTP.
+      HTTP_ALLOW_PRIVATE_HOSTS: 127.0.0.1
+      LOG_LEVEL: warn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: cp .env.example .env
+      - run: pnpm db:generate && pnpm db:deploy
+      - run: pnpm turbo run build
+      - name: Start API, worker and web
+        run: |
+          (cd apps/api && node dist/main.js > ../../api.log 2>&1 &)
+          (cd apps/worker && node --no-node-snapshot dist/main.js > ../../worker.log 2>&1 &)
+          (cd apps/web && pnpm start > ../../web.log 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:4000/api/v1/health/ready >/dev/null && curl -fs http://localhost:3000/login >/dev/null && exit 0
+            sleep 2
+          done
+          echo "services did not become ready"; tail -50 api.log worker.log web.log; exit 1
+      - run: pnpm e2e:system
+      - run: pnpm e2e:ui
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: |
+            .e2e-screenshots
+            *.log
+
+  docker:
+    name: Docker images
+    runs-on: ubuntu-latest
+    needs: checks
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        target: [api, worker, web, migrate]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: ${{ matrix.target }}
+          push: false
+          tags: flowforge-${{ matrix.target }}:ci
+          build-args: API_INTERNAL_URL=http://api:4000
+          cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}

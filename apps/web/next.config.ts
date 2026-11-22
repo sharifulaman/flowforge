@@ -1,10 +1,13 @@
 import type { NextConfig } from 'next';
+import path from 'node:path';
 
 const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:4000';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  // Trace workspace packages from the monorepo root into the standalone bundle.
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   poweredByHeader: false,
   // The browser only ever talks to this origin; /api/* is proxied to the NestJS API so
   // auth cookies are first-party and no CORS is needed.

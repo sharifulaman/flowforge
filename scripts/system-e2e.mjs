@@ -1,5 +1,8 @@
 // Full-system test: real API + real worker processes, production connector registry.
 // Usage: start the API and worker with HTTP_ALLOW_PRIVATE_HOSTS=127.0.0.1, then `node scripts/system-e2e.mjs`.
+// Against Docker: ECHO_HOST=host.docker.internal ECHO_BIND=0.0.0.0 (see docker/compose.e2e.yml).
+const ECHO_HOST = process.env.ECHO_HOST ?? '127.0.0.1';
+const ECHO_BIND = process.env.ECHO_BIND ?? '127.0.0.1';
 import { createServer } from 'node:http';
 
 const API = 'http://localhost:4000/api/v1';
@@ -15,7 +18,7 @@ const echo = createServer((req, res) => {
     res.writeHead(201, { 'content-type': 'application/json' }).end(JSON.stringify({ stored: true, id: received.length }));
   });
 });
-await new Promise((r) => echo.listen(5055, '127.0.0.1', r));
+await new Promise((r) => echo.listen(5055, ECHO_BIND, r));
 
 async function api(method, path, body) {
   const res = await fetch(`${API}${path}`, {
@@ -66,7 +69,7 @@ try {
   await api('POST', `${base}/steps`, { appKey: 'delay', operationKey: 'wait', config: { mode: 'for', amount: 2, unit: 'seconds' } });
   const built = await api('POST', `${base}/steps`, {
     appKey: 'http', operationKey: 'request',
-    config: { method: 'POST', url: 'http://127.0.0.1:5055/billing', headers: { Authorization: 'Bearer demo' }, bodyType: 'json', body: { total: '{{ step2.total }}', msg: '{{ step2.greeting }}', plan: '{{ trigger.body.plan | upper }}' } },
+    config: { method: 'POST', url: `http://${ECHO_HOST}:5055/billing`, headers: { Authorization: 'Bearer demo' }, bodyType: 'json', body: { total: '{{ step2.total }}', msg: '{{ step2.greeting }}', plan: '{{ trigger.body.plan | upper }}' } },
   });
   check(built.steps.map((s) => s.key).join(',') === 'trigger,step1,step2,step3,step4', 'steps have stable keys');
 
@@ -101,7 +104,7 @@ try {
   check(filtered.status === 'FILTERED' && filtered.steps.length === 1, `run FILTERED: ${filtered.error?.message}`);
   check(received.length === 1, 'no HTTP call for filtered run');
 
-  console.log('7. SSRF: HTTP step to cloud metadata is blocked even with private-host allowlist for 127.0.0.1');
+  console.log(`7. SSRF: HTTP step to cloud metadata is blocked even with the private-host allowlist (${ECHO_HOST})`);
   const zap2 = await api('POST', `/workspaces/${ws}/zaps`, { name: 'SSRF probe' });
   const b2 = `/workspaces/${ws}/zaps/${zap2.id}`;
   const t2 = await api('PUT', `${b2}/trigger`, { appKey: 'webhook', operationKey: 'catchHook' });

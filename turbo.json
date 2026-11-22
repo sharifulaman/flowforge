@@ -1,27 +1,52 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["NODE_ENV"],
-  "globalDependencies": [".env"],
+  "globalEnv": [
+    "NODE_ENV"
+  ],
+  "globalDependencies": [
+    ".env"
+  ],
   "tasks": {
     "generate": {
       "cache": false
     },
     "build": {
-      "dependsOn": ["^build", "generate"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "dependsOn": [
+        "^build",
+        "generate"
+      ],
+      "outputs": [
+        "dist/**",
+        ".next/**",
+        "!.next/cache/**"
+      ],
+      "env": [
+        "API_INTERNAL_URL"
+      ]
     },
     "typecheck": {
-      "dependsOn": ["^build", "generate"]
+      "dependsOn": [
+        "^build",
+        "generate"
+      ]
     },
     "test": {
-      "dependsOn": ["^build", "generate"],
+      "dependsOn": [
+        "^build",
+        "generate"
+      ],
       "cache": false
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "dev": {
-      "dependsOn": ["^build", "generate"],
+      "dependsOn": [
+        "^build",
+        "generate"
+      ],
       "cache": false,
       "persistent": true
     }

@@ -1,0 +1,12 @@
+# Test-only override: lets the system E2E's echo server (on the host) be reached from containers.
+#   docker compose -f docker-compose.yml -f docker/compose.e2e.yml up -d
+#   ECHO_HOST=host.docker.internal ECHO_BIND=0.0.0.0 pnpm e2e:system
+services:
+  api:
+    environment:
+      HTTP_ALLOW_PRIVATE_HOSTS: host.docker.internal
+    extra_hosts: ['host.docker.internal:host-gateway']
+  worker:
+    environment:
+      HTTP_ALLOW_PRIVATE_HOSTS: host.docker.internal
+    extra_hosts: ['host.docker.internal:host-gateway']

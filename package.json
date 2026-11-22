@@ -15,9 +15,14 @@
     "db:migrate": "pnpm --filter @flowforge/db migrate:dev",
     "db:deploy": "pnpm --filter @flowforge/db migrate:deploy",
     "db:seed": "pnpm --filter @flowforge/db seed",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "e2e:system": "node scripts/system-e2e.mjs",
+    "e2e:ui": "node scripts/ui-e2e.cjs .e2e-screenshots && node scripts/monitor-e2e.cjs .e2e-screenshots",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down"
   },
   "devDependencies": {
+    "playwright": "1.63.0",
     "prettier": "3.6.2",
     "turbo": "2.5.8",
     "typescript": "5.9.3"

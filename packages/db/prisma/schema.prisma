@@ -3,7 +3,11 @@
 // every query can be scoped by workspace without joins.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Generated into the package so pruned deployments (pnpm deploy) carry it.
+  output        = "../generated/client"
+  // native for local dev; debian-openssl-3.0.x for the Docker images (bookworm).
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
