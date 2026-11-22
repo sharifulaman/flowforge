@@ -31,6 +31,11 @@ export interface HttpResponse<T = unknown> {
  */
 export interface HttpClient {
   request<T = unknown>(req: HttpRequest): Promise<HttpResponse<T>>;
+  /**
+   * For non-HTTP protocols (SMTP, …): resolve `hostname` and return an address that passed the
+   * SSRF policy. Connect to the returned IP (not the hostname) so DNS can't be rebound later.
+   */
+  resolvePublicHost(hostname: string): Promise<{ address: string; family: 4 | 6 }>;
 }
 
 export interface SandboxResult {

@@ -89,3 +89,22 @@ export function assertSafeUrl(raw: string | URL, opts: SsrfOptions = {}): URL {
   }
   return url;
 }
+
+/** Resolve a hostname and return the first address, refusing non-public results. */
+export async function resolvePublicHost(hostname: string, opts: SsrfOptions = {}): Promise<{ address: string; family: 4 | 6 }> {
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const allow = new Set([...(opts.allowHosts ?? [])].map((h) => h.toLowerCase()));
+  if (isIP(host)) {
+    if (!allow.has(host) && !isPublicAddress(host)) throw new SsrfBlockedError(host, host);
+    return { address: host, family: isIP(host) as 4 | 6 };
+  }
+  if ((host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal')) && !allow.has(host)) throw new SsrfBlockedError(host);
+  const lookup = createSafeLookup(opts);
+  return new Promise((resolve, reject) => {
+    lookup(host, { all: true }, (err, addresses) => {
+      if (err) return reject(err);
+      const first = (addresses as LookupAddress[])[0]!;
+      resolve({ address: first.address, family: first.family as 4 | 6 });
+    });
+  });
+}

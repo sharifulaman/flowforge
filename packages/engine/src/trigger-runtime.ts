@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from '@flowforge/db';
 import type { TriggerJobData, ZapDefinition } from '@flowforge/shared';
 import type { CredentialStore } from './credentials';
 import { classifyError } from './errors';
-import type { SafeHttpClient } from './http';
+import type { SafeHttpClient } from '@flowforge/safe-http';
 import type { RunLauncher } from './run-launcher';
 import type { TriggerManager } from './trigger-manager';
 

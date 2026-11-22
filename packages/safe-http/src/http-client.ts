@@ -6,7 +6,7 @@ import {
   type HttpResponse,
 } from '@flowforge/connector-sdk';
 import { Agent, request as undiciRequest } from 'undici';
-import { assertSafeUrl, createSafeLookup, SsrfBlockedError, type SsrfOptions } from './ssrf';
+import { assertSafeUrl, createSafeLookup, resolvePublicHost, SsrfBlockedError, type SsrfOptions } from './ssrf';
 
 export interface SafeHttpOptions extends SsrfOptions {
   /** Default per-request timeout. */
@@ -119,6 +119,16 @@ export class SafeHttpClient implements HttpClient {
 
   async close(): Promise<void> {
     await this.agent.close();
+  }
+
+  async resolvePublicHost(hostname: string): Promise<{ address: string; family: 4 | 6 }> {
+    try {
+      return await resolvePublicHost(hostname, this.opts);
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) throw new FatalError(err.message, 'SSRF_BLOCKED');
+      if ((err as { code?: string }).code === 'ENOTFOUND') throw new FatalError(`Could not resolve host ${hostname}`, 'DNS_NOT_FOUND');
+      throw new RetryableError(`DNS lookup for ${hostname} failed: ${(err as Error).message}`);
+    }
   }
 
   async request<T = unknown>(req: HttpRequest): Promise<HttpResponse<T>> {

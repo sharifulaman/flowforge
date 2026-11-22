@@ -14,12 +14,18 @@
   "dependencies": {
     "@flowforge/connector-sdk": "workspace:*",
     "@flowforge/shared": "workspace:*",
-    "cron-parser": "4.9.0"
+    "cron-parser": "4.9.0",
+    "fast-xml-parser": "4.5.7",
+    "nodemailer": "7.0.13"
   },
   "devDependencies": {
     "@flowforge/tsconfig": "workspace:*",
     "@types/node": "22.18.12",
     "typescript": "5.9.3",
-    "vitest": "3.2.7"
+    "vitest": "3.2.7",
+    "@types/nodemailer": "7.0.12",
+    "smtp-server": "3.21.7",
+    "@types/smtp-server": "3.5.13",
+    "@flowforge/safe-http": "workspace:*"
   }
 }

@@ -2,7 +2,7 @@ import { type ActionDefinition, type ConnectorLogger, type ConnectorRegistry, Fa
 import { resolveTemplates, type StepDefinition, type TemplateScope } from '@flowforge/shared';
 import type { CredentialStore } from './credentials';
 import { classifyError, type ErrorClass, StepTimeoutError } from './errors';
-import type { SafeHttpClient } from './http';
+import type { SafeHttpClient } from '@flowforge/safe-http';
 
 export const DEFAULT_STEP_TIMEOUT_MS = 30_000;
 export const MIN_STEP_TIMEOUT_MS = 1_000;

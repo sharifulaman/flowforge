@@ -18,14 +18,17 @@ each step's output can be referenced by later steps with `{{ stepKey.path }}` te
 ```
 shared         isomorphic: zod DTOs, queue contracts, templating; node-only: crypto, env, logger
 connector-sdk  defineApp(), operation/auth types, JSON-schema validation, ConnectorRegistry
-connectors     built-in apps + createDefaultRegistry()
-engine         runtime core used by api + worker: SSRF-safe HTTP, CredentialStore (AES-256-GCM,
+safe-http      SSRF-protected HTTP client (+ resolvePublicHost for SMTP)
+connectors     built-in apps + createDefaultRegistry(): Webhooks, Schedule, HTTP Request, Filter,
+               Delay, Code, Email (SMTP), Slack, Google Sheets, Telegram, RSS
+engine         runtime core used by api + worker: CredentialStore (AES-256-GCM,
                OAuth refresh), publish validation, RunLauncher, TriggerManager, RunExecutor,
                TriggerRuntime (schedule/poll), StepTester, maintenance
 db             Prisma schema, migrations, client
 ```
 
-Dependency direction: `shared ← connector-sdk ← connectors`, `shared/db/connector-sdk ← engine ← api/worker`.
+Dependency direction: `shared ← connector-sdk ← safe-http`, `connector-sdk ← connectors`, `db/safe-http ← engine ← api/worker`.
+See `docs/CONNECTORS.md` for writing connectors.
 The engine never imports `connectors`; the registry is injected (tests use fixture apps).
 
 ## Key flows

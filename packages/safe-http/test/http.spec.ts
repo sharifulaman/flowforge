@@ -223,6 +223,16 @@ describe('SafeHttpClient', () => {
     await strict.close();
   });
 
+  it('resolves public hosts for non-HTTP protocols, blocking private ones', async () => {
+    const strict = new SafeHttpClient();
+    await expect(strict.resolvePublicHost('127.0.0.1')).rejects.toMatchObject({ code: 'SSRF_BLOCKED' });
+    await expect(strict.resolvePublicHost('localhost')).rejects.toMatchObject({ code: 'SSRF_BLOCKED' });
+    await expect(strict.resolvePublicHost('10.0.0.5')).rejects.toMatchObject({ code: 'SSRF_BLOCKED' });
+    expect(await strict.resolvePublicHost('8.8.8.8')).toEqual({ address: '8.8.8.8', family: 4 });
+    expect(await http.resolvePublicHost('127.0.0.1')).toEqual({ address: '127.0.0.1', family: 4 });
+    await strict.close();
+  });
+
   it('parses Retry-After', () => {
     expect(parseRetryAfter('10')).toBe(10_000);
     expect(parseRetryAfter('99999')).toBe(3_600_000);

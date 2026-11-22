@@ -1,4 +1,4 @@
-export * from './http';
+export * from '@flowforge/safe-http';
 export * from './oauth2';
 export * from './credentials';
 export * from './publish';
