@@ -88,10 +88,18 @@ export class RunsService {
   async detail(workspaceId: string, runId: string): Promise<RunDetailDto> {
     const run = await this.prisma.run.findFirst({
       where: { id: runId, workspaceId },
-      include: { zap: { select: { name: true } }, zapVersion: { select: { version: true } }, steps: { orderBy: { position: 'asc' } } },
+      include: { zap: { select: { name: true } }, zapVersion: { select: { version: true, definition: true } }, steps: { orderBy: { position: 'asc' } } },
     });
     if (!run) throw ApiException.notFound('Run');
-    return { ...toSummary(run), zapVersion: run.zapVersion.version, triggerOutput: run.triggerOutput, steps: run.steps.map(toStepRun) };
+    const def = run.zapVersion.definition as unknown as ZapDefinition;
+    const planStep = (s: ZapDefinition['trigger']) => ({ key: s.key, name: s.name, appKey: s.appKey, operationKey: s.operationKey });
+    return {
+      ...toSummary(run),
+      zapVersion: run.zapVersion.version,
+      triggerOutput: run.triggerOutput,
+      plan: { trigger: planStep(def.trigger), steps: (def.steps ?? []).map(planStep) },
+      steps: run.steps.map(toStepRun),
+    };
   }
 
   /**

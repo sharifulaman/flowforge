@@ -62,8 +62,17 @@ export interface StepRunDto {
   durationMs: number | null;
 }
 
+export interface RunPlanStep {
+  key: string;
+  name: string | null;
+  appKey: string;
+  operationKey: string;
+}
+
 export interface RunDetailDto extends RunSummaryDto {
   zapVersion: number;
   triggerOutput: unknown;
+  /** Trigger + actions of the executed version, in order (including steps that never ran). */
+  plan: { trigger: RunPlanStep; steps: RunPlanStep[] };
   steps: StepRunDto[];
 }

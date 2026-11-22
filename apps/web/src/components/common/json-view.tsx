@@ -17,7 +17,7 @@ export function JsonView({ value, className, maxHeight = 'max-h-80' }: { value: 
     },
   );
   return (
-    <div className={cn('group relative rounded-lg border bg-muted/40', className)}>
+    <div className={cn('group relative min-w-0 max-w-full rounded-lg border bg-muted/40', className)}>
       <button
         type="button"
         onClick={() => {

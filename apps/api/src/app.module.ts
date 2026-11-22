@@ -15,6 +15,7 @@ import { ConnectionsModule } from './modules/connections/connections.module';
 import { HooksModule } from './modules/hooks/hooks.module';
 import { MembersModule } from './modules/members/members.module';
 import { RunsModule } from './modules/runs/runs.module';
+import { StatsModule } from './modules/stats/stats.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 import { ZapsModule } from './modules/zaps/zaps.module';
 import { RuntimeModule } from './runtime/runtime.module';
@@ -47,6 +48,7 @@ export class AppModule {
         ConnectionsModule,
         ZapsModule,
         RunsModule,
+        StatsModule,
         HooksModule,
         HealthModule,
       ],

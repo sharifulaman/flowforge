@@ -87,6 +87,11 @@ describe('IsolatedVmSandbox', () => {
     expect(circular.code).toBe('CODE_BAD_OUTPUT');
   });
 
+  it('keeps console output when the code throws', async () => {
+    const err = await sandbox.run('console.log("before"); throw new Error("boom")', {}).catch((e) => e);
+    expect(err).toMatchObject({ code: 'CODE_ERROR', details: { logs: [{ level: 'log', message: 'before' }] } });
+  });
+
   it('caps output size', async () => {
     const small = new IsolatedVmSandbox({ maxOutputBytes: 1_000 });
     expect((await small.run('return "x".repeat(5000);', {}).catch((e) => e)).code).toBe('CODE_OUTPUT_TOO_LARGE');

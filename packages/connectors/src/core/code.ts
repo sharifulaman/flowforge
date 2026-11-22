@@ -37,8 +37,20 @@ export default defineApp({
       ),
       sampleOutput: { greeting: 'Hello, Ada!' },
       async run({ input, sandbox, logger }) {
-        const { result, logs } = await sandbox.run(input.code, (input.inputData ?? {}) as Record<string, unknown>, { timeoutMs: 5_000 });
-        for (const l of logs) logger[l.level === 'log' ? 'info' : l.level](l.message);
+        const emit = (logs: Array<{ level: string; message: string }>) => {
+          for (const l of logs) logger[l.level === 'warn' || l.level === 'error' ? l.level : 'info'](l.message);
+        };
+        let res;
+        try {
+          res = await sandbox.run(input.code, (input.inputData ?? {}) as Record<string, unknown>, { timeoutMs: 5_000 });
+        } catch (err) {
+          // The sandbox attaches console output to errors (details.logs): show it in the run.
+          const logs = (err as { details?: { logs?: unknown } })?.details?.logs;
+          if (Array.isArray(logs)) emit(logs);
+          throw err;
+        }
+        const { result, logs } = res;
+        emit(logs);
         // Steps output objects; wrap scalars/arrays so later steps can reference {{ stepN.result }}.
         return result !== null && typeof result === 'object' && !Array.isArray(result) ? result : { result };
       },

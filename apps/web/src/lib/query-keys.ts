@@ -9,6 +9,12 @@ export const queryKeys = {
   samples: (ws: string, zapId: string) => ['zaps', ws, 'samples', zapId] as const,
   versions: (ws: string, zapId: string) => ['zaps', ws, 'versions', zapId] as const,
   connections: (ws: string) => ['connections', ws] as const,
+  runs: (ws: string) => ['runs', ws] as const,
+  runList: (ws: string, filters: object) => ['runs', ws, 'list', filters] as const,
+  run: (ws: string, runId: string) => ['runs', ws, 'detail', runId] as const,
+  stats: (ws: string, range: string) => ['stats', ws, range] as const,
+  members: (ws: string) => ['members', ws] as const,
+  apiKeys: (ws: string) => ['api-keys', ws] as const,
   options: (ws: string, appKey: string, loader: string, connectionId: string | null, deps: string) =>
     ['options', ws, appKey, loader, connectionId, deps] as const,
 };

@@ -87,7 +87,9 @@ export class IsolatedVmSandbox implements Sandbox {
       }
       return { result: json === undefined ? null : JSON.parse(json), logs };
     } catch (err) {
-      throw this.mapError(err, isolate, timeoutMs, memoryMb);
+      // Keep console output on failure — it's what users need to debug their code.
+      const mapped = this.mapError(err, isolate, timeoutMs, memoryMb);
+      throw new FatalError(mapped.message, (mapped as FatalError).code ?? 'CODE_ERROR', { logs });
     } finally {
       if (wallTimer) clearTimeout(wallTimer);
       if (!isolate.isDisposed) isolate.dispose();

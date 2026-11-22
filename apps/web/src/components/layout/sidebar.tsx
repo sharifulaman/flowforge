@@ -11,7 +11,7 @@ import { WorkspaceSwitcher } from './workspace-switcher';
 function NavLink({ item, base, onNavigate }: { item: NavItem; base: string; onNavigate?: () => void }) {
   const pathname = usePathname();
   const href = `${base}${item.href}`;
-  const active = item.href === '' ? pathname === base : pathname.startsWith(href);
+  const active = item.href === '' ? pathname === base : item.exact ? item.exact.some((p) => pathname === `${base}${p}`) : pathname.startsWith(href);
   const Icon = item.icon;
 
   const classes = cn(
@@ -61,12 +61,12 @@ export function SidebarContent({ workspaceId, onNavigate }: { workspaceId: strin
           <NavLink key={item.label} item={item} base={base} onNavigate={onNavigate} />
         ))}
       </nav>
-      <div className="mt-auto grid gap-0.5">
+      <nav className="mt-auto grid gap-0.5" aria-label="Workspace settings">
         <p className="px-2.5 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Workspace</p>
         {NAV_SECONDARY.map((item) => (
           <NavLink key={item.label} item={item} base={base} onNavigate={onNavigate} />
         ))}
-      </div>
+      </nav>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import type { ZapDetailDto } from '@flowforge/shared';
-import { AlertTriangleIcon, ArrowLeftIcon, UploadIcon } from 'lucide-react';
+import { ActivityIcon, AlertTriangleIcon, ArrowLeftIcon, UploadIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ZapStatusBadge } from '@/components/zaps/zap-status';
@@ -52,6 +52,11 @@ export function BuilderHeader({
       <ZapStatusBadge status={zap.status} />
       {zap.publishedVersion && <span className="hidden text-xs text-muted-foreground sm:inline">v{zap.publishedVersion}</span>}
       <div className="ml-auto flex items-center gap-2">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/w/${ws}/runs?zapId=${zap.id}`}>
+            <ActivityIcon /> <span className="hidden sm:inline">Runs</span>
+          </Link>
+        </Button>
         {issues.length > 0 && (
           <Popover>
             <PopoverTrigger asChild>

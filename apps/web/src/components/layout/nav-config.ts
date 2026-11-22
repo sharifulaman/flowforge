@@ -15,16 +15,18 @@ export interface NavItem {
   icon: LucideIcon;
   /** Not yet available; rendered disabled with a "Soon" badge. */
   soon?: boolean;
+  /** Only these sub-paths mark the item active (instead of prefix matching). */
+  exact?: string[];
 }
 
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '', icon: LayoutDashboardIcon },
   { label: 'Zaps', href: '/zaps', icon: WorkflowIcon },
-  { label: 'Runs', href: '/runs', icon: ActivityIcon, soon: true },
+  { label: 'Runs', href: '/runs', icon: ActivityIcon },
   { label: 'Connections', href: '/connections', icon: PlugIcon },
 ];
 
 export const NAV_SECONDARY: NavItem[] = [
-  { label: 'API keys', href: '/settings/api-keys', icon: KeyRoundIcon, soon: true },
-  { label: 'Settings', href: '/settings', icon: SettingsIcon, soon: true },
+  { label: 'API keys', href: '/settings/api-keys', icon: KeyRoundIcon },
+  { label: 'Settings', href: '/settings', icon: SettingsIcon, exact: ['/settings', '/settings/members'] },
 ];

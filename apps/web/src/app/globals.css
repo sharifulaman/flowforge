@@ -31,6 +31,10 @@
   --sidebar-foreground: oklch(0.21 0.01 286);
   --sidebar-border: oklch(0.92 0.004 286);
   --sidebar-accent: oklch(0.94 0.008 280);
+  /* Run-status chart series (validated: CVD-safe all-pairs, see dashboard/runs-chart.tsx). */
+  --chart-succeeded: #2a78d6;
+  --chart-failed: #eb6834;
+  --chart-filtered: #1baf7a;
 }
 
 .dark {
@@ -59,6 +63,9 @@
   --sidebar-foreground: oklch(0.97 0.002 286);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-accent: oklch(0.23 0.012 280);
+  --chart-succeeded: #3987e5;
+  --chart-failed: #d95926;
+  --chart-filtered: #199e70;
 }
 
 @theme inline {

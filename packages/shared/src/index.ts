@@ -10,3 +10,4 @@ export * from './schemas/connections';
 export * from './schemas/zaps';
 export * from './schemas/runs';
 export * from './templating';
+export * from './schemas/stats';

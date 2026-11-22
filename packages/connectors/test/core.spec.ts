@@ -193,6 +193,14 @@ describe('Code', () => {
     expect(logs).toEqual([{ level: 'info', message: 'hi' }]);
   });
 
+  it('emits console output attached to sandbox errors before rethrowing', async () => {
+    const { FatalError } = await import('@flowforge/connector-sdk');
+    const sandbox = { run: async () => Promise.reject(new FatalError('Code error: boom', 'CODE_ERROR', { logs: [{ level: 'log', message: 'seats 50' }] })) };
+    const logs: Array<{ level: string; message: string }> = [];
+    await expect(code.run(actionCtx({ input: { code: 'x' }, sandbox, logs }))).rejects.toMatchObject({ code: 'CODE_ERROR' });
+    expect(logs).toEqual([{ level: 'info', message: 'seats 50' }]);
+  });
+
   it('propagates sandbox errors (e.g. timeouts) unchanged', async () => {
     const sandbox = { run: async () => Promise.reject(new RetryableError('x')) };
     await expect(code.run(actionCtx({ input: { code: 'x' }, sandbox }))).rejects.toBeInstanceOf(RetryableError);
