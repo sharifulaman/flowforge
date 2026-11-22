@@ -1,0 +1,334 @@
+// FlowForge database schema.
+// Every tenant-owned table carries `workspaceId` (denormalized where needed) so that
+// every query can be scoped by workspace without joins.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── Identity ─────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatarUrl     String?
+  passwordHash  String? // null for Google-only users
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts    OAuthAccount[]
+  sessions    Session[]
+  memberships Membership[]
+}
+
+model OAuthAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String // "google"
+  providerAccountId String
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String    @unique
+  familyId         String // rotation family for reuse detection
+  userAgent        String?
+  ip               String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+// ───────────── Tenancy ─────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+  apiKeys     ApiKey[]
+  connections Connection[]
+  zaps        Zap[]
+  runs        Run[]
+}
+
+model Membership {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        Role      @default(MEMBER)
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  prefix      String // "ff_live_ab12" shown in UI
+  keyHash     String    @unique // sha256 of full key
+  createdById String
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+// ───────────── Connections (encrypted credentials) ─────────────
+
+enum ConnectionAuthType {
+  OAUTH2
+  API_KEY
+  BASIC
+  CUSTOM
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  ERROR
+  EXPIRED
+}
+
+model Connection {
+  id          String             @id @default(cuid())
+  workspaceId String
+  appKey      String // "slack", "google-sheets"
+  name        String
+  authType    ConnectionAuthType
+  status      ConnectionStatus   @default(ACTIVE)
+  ciphertext  Bytes // AES-256-GCM encrypted JSON
+  iv          Bytes // 12 bytes
+  authTag     Bytes // 16 bytes
+  keyVersion  Int                @default(1)
+  displayInfo Json? // non-secret: account email, team name
+  scopes      String[]
+  expiresAt   DateTime? // OAuth access-token expiry
+  lastUsedAt  DateTime?
+  lastError   String?
+  createdById String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  steps       ZapStep[]
+
+  @@index([workspaceId, appKey])
+}
+
+// ───────────── Zaps ─────────────
+
+enum ZapStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ERROR // auto-paused (e.g. repeated failures, broken connection)
+}
+
+enum StepType {
+  TRIGGER
+  ACTION
+}
+
+model Zap {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  name               String
+  description        String?
+  status             ZapStatus @default(DRAFT)
+  publishedVersionId String?   @unique
+  nextStepNumber     Int       @default(1) // monotonic counter for stable step keys
+  createdById        String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  steps            ZapStep[]
+  versions         ZapVersion[]  @relation("ZapVersions")
+  publishedVersion ZapVersion?   @relation("PublishedVersion", fields: [publishedVersionId], references: [id])
+  triggerState     TriggerState?
+  runs             Run[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, updatedAt])
+}
+
+model ZapStep {
+  id           String      @id @default(cuid())
+  zapId        String
+  workspaceId  String
+  key          String // "trigger" | "step1" | "step2" … never renumbered
+  type         StepType
+  position     Int // 0 = trigger
+  name         String?
+  appKey       String
+  operationKey String // trigger/action key within the app
+  connectionId String?
+  config       Json        @default("{}") // may contain {{templates}}
+  timeoutMs    Int?
+  sampleOutput Json? // last test output → field picker
+  sampleAt     DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  zap          Zap         @relation(fields: [zapId], references: [id], onDelete: Cascade)
+  connection   Connection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@unique([zapId, key])
+  @@index([zapId, position])
+  @@index([workspaceId])
+}
+
+model ZapVersion {
+  id          String   @id @default(cuid())
+  zapId       String
+  workspaceId String
+  version     Int
+  definition  Json // immutable snapshot: { trigger, steps[] }
+  createdById String
+  createdAt   DateTime @default(now())
+  zap         Zap      @relation("ZapVersions", fields: [zapId], references: [id], onDelete: Cascade)
+  publishedOf Zap?     @relation("PublishedVersion")
+  runs        Run[]
+
+  @@unique([zapId, version])
+}
+
+model TriggerState {
+  zapId        String    @id
+  workspaceId  String
+  kind         String // "webhook" | "schedule" | "poll" | "app_event"
+  hookToken    String?   @unique // public URL token (webhook + app events)
+  cursor       Json? // polling cursor
+  subscription Json? // provider-side subscription info (app events)
+  lastFiredAt  DateTime?
+  lastPolledAt DateTime?
+  lastError    String?
+  updatedAt    DateTime  @updatedAt
+  zap          Zap       @relation(fields: [zapId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model PollDedupe {
+  zapId     String
+  itemKey   String
+  createdAt DateTime @default(now())
+
+  @@id([zapId, itemKey])
+  @@index([createdAt]) // TTL cleanup
+}
+
+// ───────────── Runs ─────────────
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  WAITING // delayed (Delay step / backoff)
+  SUCCEEDED
+  FAILED
+  FILTERED // stopped by a Filter step
+  CANCELED
+}
+
+enum RunSource {
+  WEBHOOK
+  SCHEDULE
+  POLL
+  APP_EVENT
+  MANUAL
+  REPLAY
+}
+
+enum StepRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+  FILTERED
+}
+
+model Run {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  zapId          String
+  zapVersionId   String
+  status         RunStatus @default(QUEUED)
+  source         RunSource
+  idempotencyKey String
+  triggerOutput  Json
+  error          Json? // { message, code, stepKey }
+  attempts       Int       @default(0)
+  replayOfId     String?
+  queuedAt       DateTime  @default(now())
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  durationMs     Int?
+
+  workspace  Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  zap        Zap        @relation(fields: [zapId], references: [id], onDelete: Cascade)
+  zapVersion ZapVersion @relation(fields: [zapVersionId], references: [id])
+  replayOf   Run?       @relation("Replays", fields: [replayOfId], references: [id], onDelete: SetNull)
+  replays    Run[]      @relation("Replays")
+  steps      StepRun[]
+
+  @@unique([zapId, idempotencyKey])
+  @@index([workspaceId, queuedAt(sort: Desc)])
+  @@index([workspaceId, status, queuedAt(sort: Desc)])
+  @@index([zapId, queuedAt(sort: Desc)])
+}
+
+model StepRun {
+  id           String        @id @default(cuid())
+  runId        String
+  workspaceId  String
+  stepKey      String
+  position     Int
+  appKey       String
+  operationKey String
+  status       StepRunStatus @default(PENDING)
+  input        Json? // resolved config (secrets redacted)
+  output       Json?
+  error        Json?
+  attempts     Int           @default(0)
+  logs         Json? // console output from Code step, etc.
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  durationMs   Int?
+  run          Run           @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, stepKey])
+  @@index([workspaceId])
+}

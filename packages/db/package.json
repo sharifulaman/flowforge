@@ -1,0 +1,32 @@
+{
+  "name": "@flowforge/db",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json -w --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
+    "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
+    "migrate:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
+    "seed": "dotenv -e ../../.env -- node dist/seed.js",
+    "studio": "dotenv -e ../../.env -- prisma studio"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "argon2": "0.45.2"
+  },
+  "devDependencies": {
+    "@flowforge/tsconfig": "workspace:*",
+    "@types/node": "22.18.12",
+    "prisma": "6.19.3",
+    "typescript": "5.9.3",
+    "dotenv-cli": "11.1.0"
+  }
+}
